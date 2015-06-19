@@ -5,11 +5,13 @@ title: Implementing and optimizing a slab allocator
 
 *Code and post in progress, [code here](github.com/schets/fast_alloc)*
 
-'''C
+```C
 struct testing_code_highlighting {
+
     size_t value;
+
 };
-'''
+```
 
 Next you can update your site name, avatar and other options using the _config.yml file in the root of your repository (shown below).
 
