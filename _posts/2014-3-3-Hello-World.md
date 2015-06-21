@@ -1,9 +1,12 @@
 ---
 layout: post
-title: Implementing and optimizing a slab allocator
+title: Implementing and optimizing a simple slab allocator
 ---
 
 *Code and post in progress, [code here](github.com/schets/fast_alloc)*
+
+#libc malloc reference : http://code.woboq.org/userspace/glibc/malloc/malloc.c.html#__libc_malloc
+
 
 ```C
 struct testing_code_highlighting {
