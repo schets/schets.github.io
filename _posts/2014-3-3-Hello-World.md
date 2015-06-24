@@ -33,8 +33,6 @@ struct free_list_chunk {
 The simplest allocator that can be created with a free list works in a fixed block of memory and simply pushes/pops chunks from the list
 
 ```C
-#define NEXT_CHUNK(x) *(void **)x
-
 union fixed_list_chunk {
     union fixed_list_chunk *next;
     char data[];
@@ -42,40 +40,59 @@ union fixed_list_chunk {
 
 struct fixed_list {
     union fixed_list_chunk *head; //head is void since is union of uknown types
+    union fixed_list_chunk *data;
 }
 
 void *fixed_list_malloc(struct fixed_list *from) {
     if(!from->head)
         return NULL;
-    void *data = from->head;
-    from->head = NEXT_CHUNK(from->head);
+    void *data = from->head->data;
+    from->head = from->head->next;
     return data;
 }
 
-void *fixed_list_free(struct fixed_list *from, void *freeptr) {
+void fixed_list_free(struct fixed_list *from, void *freeptr) {
     if(!freeptr)
         return NULL;
-    NEXT_CHUNK(freeptr) = from->head;
-    from->head = freeptr;
+    ((fixed_list_chunk *)freeptr)->next = from->head;
+    from->head->next = freeptr;
 }
 ```
 
-along with the initialization and freeing functions
+along with the initialization, freeing, and size padding functions
 
 ```C
-fixed_list create_fixed_list(size_t object_num, size_t object_size) {
+#define ALIGN_TO sizeof(void *) //could be 16 bytes if needed for sse
+size_t pad_size(size_t start_size) {
+    if(start_size < ALIGN_TO)
+        return ALIGN_TO;
+    else if (!(start_size % ALIGN_TO))
+        return start_size;
+    return start_size + (ALIGN_TO - (start_size % ALIGN_TO))
+}
+
+struct fixed_list create_fixed_list(size_t object_num, size_t object_size) {
     fixed_list retlist;
-    object_size = object_size < sizeof(void *) ? sizeof(void *) : object_size; //also padding...
-    retlist.head = (fixed_list_chunk *)malloc(object_num * object_size);
-    if(retlist.head) {
-        void *cur_chunk = retlist.head;
+    object_size = pad_size(object_size);
+    //in GCC this could be sizeof(union {void *stuff; char data[object_size]})
+
+    retlist.data = (fixed_list_chunk *)malloc(object_num * object_size);
+    retlist.head = retlist.data;
+
+
+    if(retlist.data) {
+        union fixed_list_chunk *cur_chunk = retlist.data;
         for(size_t i = 0; i < object_num - 1; i++) {
             void *next_chunk = (char *)cur_chunk + object_size;
-            NEXT_CHUNK(cur_chunk) = next_chunk;
+            cur_chunk->next = next_chunk;
             cur_chunk = next_chunk;
         }
-        NEXT_CHUNK(cur_chunk) = NULL;
+        cur_chunk->next  = NULL;
     }
     return retlist;
+}
+
+struct fixed_list destroy_fixed_list(fixed_list *inlist) {
+    free(retlist.data);
 }
 ```
