@@ -59,7 +59,7 @@ void fixed_list_free(struct fixed_list *from, void *freeptr) {
 }
 ```
 
-fixed_list_malloc simply pops a chunk of memory of the head of the list while fixed_list_free pushes the chunk on.
+```fixed_list_malloc``` simply pops a chunk of memory of the head of the list while fixed_list_free pushes the chunk on.
 
 All that's needed are initialization and deletion methods
 
