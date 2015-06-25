@@ -25,7 +25,7 @@ struct free_list_chunk {
 
     union {
         struct free_list_chunk *next_chunk;
-        char data[];
+        char data[alloc_size];
     } chunk;
 };
 ```
@@ -35,7 +35,7 @@ The simplest allocator that can be created with a free list is
 ```C
 union fixed_list_chunk {
     union fixed_list_chunk *next;
-    char data[];
+    char data[1]; //needs a size, char c[] not supported in unions
 };
 
 struct fixed_list {
