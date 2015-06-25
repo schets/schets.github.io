@@ -16,7 +16,7 @@ blah blah blah memory is important malloc is slow many datastructures are only a
 #Free Lists#
 [Free lists](https://en.wikipedia.org/wiki/Free_list) are one of the most convinient methods of creating an allocator, and are pretty easy to implement. They're used in some of the most common allocators used today, including [ptmalloc (glibc malloc)](http://code.woboq.org/userspace/glibc/malloc), [jemalloc](http://www.canonware.com/jemalloc/) and [tcmalloc](http://goog-perftools.sourceforge.net/doc/tcmalloc.html), as well as in many [specialized allocators](http://gameprogrammingpatterns.com/object-pool.html).
 
-The basic idea behind a free list is that one stores a linked list of open memory chunks that acts as a stack for allocating (popping a chunk) and freeing (pushing a chunk). For our purposes, this data structure will resemble
+The basic idea behind a free list is that one stores a linked list of open memory chunks that acts as a stack for allocating and freeing. For our purposes, the memory chunk layout will resemble
 
 ```C
 struct free_list_chunk {
@@ -30,7 +30,7 @@ struct free_list_chunk {
 };
 ```
 
-The simplest allocator that can be created with a free list works in a fixed block of memory and simply pushes/pops chunks from the list
+The simplest allocator that can be created with a free list is
 
 ```C
 union fixed_list_chunk {
@@ -39,8 +39,8 @@ union fixed_list_chunk {
 };
 
 struct fixed_list {
-    union fixed_list_chunk *head; //head is void since is union of uknown types
-    union fixed_list_chunk *data;
+    union fixed_list_chunk *head;
+    void *data;
 }
 
 void *fixed_list_malloc(struct fixed_list *from) {
@@ -55,15 +55,23 @@ void fixed_list_free(struct fixed_list *from, void *freeptr) {
     if(!freeptr)
         return NULL;
     ((fixed_list_chunk *)freeptr)->next = from->head;
-    from->head->next = freeptr;
+    from->head = freeptr;
 }
 ```
 
-along with the initialization, freeing, and size padding functions
+fixed_list_malloc simply pops a chunk of memory of the head of the list while fixed_list_free pushes the chunk on.
+
+All that's needed are initialization and deletion methods
 
 ```C
-#define ALIGN_TO sizeof(void *) //could be 16 bytes if needed for sse
+
+#define ALIGN_TO sizeof(void *)
+//Could be 16 bytes, or an allocator parameter
+
 size_t pad_size(size_t start_size) {
+    //If your compiler supports variable length arrays, this could be
+    //sizeof(union {void *stuff, char[start_size] data;});
+    
     if(start_size < ALIGN_TO)
         return ALIGN_TO;
     else if (!(start_size % ALIGN_TO))
@@ -73,19 +81,18 @@ size_t pad_size(size_t start_size) {
 
 struct fixed_list create_fixed_list(size_t object_num, size_t object_size) {
     fixed_list retlist;
+
+    //pad the data to ensure proper alignment on each allocation
     object_size = pad_size(object_size);
-    //in GCC this could be sizeof(union {void *stuff; char data[object_size]})
 
-    retlist.data = (fixed_list_chunk *)malloc(object_num * object_size);
+    retlist.data = malloc(object_num * object_size);
     retlist.head = retlist.data;
-
 
     if(retlist.data) {
         union fixed_list_chunk *cur_chunk = retlist.data;
         for(size_t i = 0; i < object_num - 1; i++) {
-            void *next_chunk = (char *)cur_chunk + object_size;
-            cur_chunk->next = next_chunk;
-            cur_chunk = next_chunk;
+            void *cur_chunk->next = (char *)cur_chunk + object_size;
+            cur_chunk = cur_chunk->next;
         }
         cur_chunk->next  = NULL;
     }
@@ -97,3 +104,5 @@ struct fixed_list destroy_fixed_list(fixed_list *inlist) {
 }
 
 ```
+
+And we have a working (albeit rudimentary) allocator
