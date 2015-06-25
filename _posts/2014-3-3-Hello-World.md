@@ -95,4 +95,5 @@ struct fixed_list create_fixed_list(size_t object_num, size_t object_size) {
 struct fixed_list destroy_fixed_list(fixed_list *inlist) {
     free(retlist.data);
 }
+
 ```
