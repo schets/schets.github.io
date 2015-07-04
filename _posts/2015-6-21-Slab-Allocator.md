@@ -3,7 +3,7 @@ layout: post
 title: Free lists and per-datastructure allocators
 ---
 
-*Code and post in progress, [code here](https://github.com/schets/fast_alloc)*
+*Code and post in progress, [different version of code here](https://github.com/schets/fast_alloc)*
 
 #Intro#
 
