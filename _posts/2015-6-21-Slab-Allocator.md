@@ -176,7 +176,7 @@ The implementations that will be compared are:
 
 Here are the results:
 
-<img src="{{site.baseurl}}/images/copy_many.png"/>
+<img src="{{site.baseurl}}/images/bench_copy_ns.png"/>
 
 footers when I figure them out:
 
