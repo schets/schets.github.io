@@ -16,9 +16,9 @@ description: Software developer and Lisp enthusiast
 
 # Includes an icon in the footer for each username you enter
 footer-links:
-  email:
+  email: samuelschetterer@gmail.com
   github: schets
-  linkedin: 
+  twitter: sams1123
 
 # Enter your Google Analytics web tracking code (e.g. UA-2110908-2) to activate tracking
 google_analytics: UA-64316678-1

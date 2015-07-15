@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Free lists and per-datastructure allocators
+title: Fixed size free lists and per-datastructure allocators
 ---
 
 *Code and post in progress, [different version of code here](https://github.com/schets/fast_alloc)*.
@@ -17,11 +17,11 @@ blah blah blah memory is important malloc is slow many datastructures are only a
 
 
 #Fixed Size Free List#
-[Free lists](https://en.wikipedia.org/wiki/Free_list) are one of the most convinient methods of creating an allocator, and are pretty easy to implement. They're used in some of the most common allocators used today, including [ptmalloc (glibc malloc)](http://code.woboq.org/userspace/glibc/malloc), [jemalloc](http://www.canonware.com/jemalloc/) and [tcmalloc](http://goog-perftools.sourceforge.net/doc/tcmalloc.html), as well as in many [specialized allocators](http://gameprogrammingpatterns.com/object-pool.html).
+[Free lists](https://en.wikipedia.org/wiki/Free_list) are one of (if not the) most effective tools for creating allocators. They're used in some of the most common allocators, including [ptmalloc (used in glibc)](http://code.woboq.org/userspace/glibc/malloc), [jemalloc](http://www.canonware.com/jemalloc/) and [tcmalloc](http://goog-perftools.sourceforge.net/doc/tcmalloc.html), as well as in many [specialized allocators](http://gameprogrammingpatterns.com/object-pool.html).
 
-The fixed size free list only allocates memory chunks of a single size, allowing for a simple and fast free list implementation ([This is a good introduction free lists] (http://gameprogrammingpatterns.com/object-pool.html)). 
+The fixed size free list only allocates memory chunks of a single size, allowing for a simple and fast free list implementation [This is a good introduction] (http://gameprogrammingpatterns.com/object-pool.html) to the type of list that we'll be implementing. 
 
-Our implementation will work similary, except it will store a list of memory blocks from which memory 'units' can be allocated so the size can change depending on allocation requirements.
+Our implementation will work similary, except it will store a list of memory blocks from which memory 'units' can be allocated so that the allocator can expand as needed.
 
 The types that this allocator needs for storing/dispensing memory are
 
@@ -35,7 +35,7 @@ union chunk {
 //!Block of memory where chunks are held
 struct slab {
     chunk *data; //pointer to beginning of data segment
-    struct slab *next; //pointer to next slab in salb list
+    struct slab *next; //pointer to next slab in slab list
 };
 ```
 
@@ -142,9 +142,8 @@ Furthermore, since elements are tightly packed in blocks, the returned data is m
 Haven't written, but free list is much faster for creation and lookups (3/4 - 1/2 runtime on medium or small datastructures)
 
 #Copying 'Garbage Collector'#
-Disclaimer : code/benchmarks not performed here yet
 
-[Copying Garbage Collection](https://en.wikipedia.org/wiki/Cheney's_algorithm) is a form of garbage collection where after collection, live data is copied into a new heap.
+[Copying Garbage Collection](https://en.wikipedia.org/wiki/Cheney's_algorithm) is a form of garbage collection where collection consists of copying live memory to a new heap allocating where the old heap existed.
 Many collectors, incluing most if not all generational algorithms, use a variant of this.
 [Here's](http://spin.atomicobject.com/2014/09/03/visualizing-garbage-collection-algorithms/) a great article with visualizations of various algorithms, concluding with copying algorithms. 
 
@@ -180,4 +179,5 @@ Here are the results:
 
 footers when I figure them out:
 
-1. other allocators can be used like this as well. A linear allocator, or bump allocator, will act even more like a copying garbage collector since memory is allocated ith a pointer increment at the cost of not freeing anything until the allocator itself drops the memory, and smashing the cache
+1. Other allocators can be used like this as well. A linear allocator, or bump allocator, will act even more like a copying garbage collector since memory is allocated with a pointer increment
+However, memory can ony be freed in very specific patterns or by freeing the entire allocator, which leads to poor resuse of memory space
