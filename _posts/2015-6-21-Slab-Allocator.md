@@ -134,8 +134,7 @@ void list_destroy(struct free_list *ldel) {
 }
 ```
 
-With not a lot of code, we've managed to make a fairly performant allocator - most allocations only pop an element form the list, and all frees simply push an element.
-Furthermore, since elements are tightly packed in blocks, the returned data is much friendlier to the cache. The effect of this can be lessened as an instance accumulates more slabs and the chunks from each one are mixed in the list, but that doesn't always matter as much in practice - due to the way data is freed, allocations will usually return a recently accessed pointer anyways.
+We've managed to make a fairly performant allocator - on my laptop a tight loop random list_malloc/list_free pairs takes ~1.8 ns, as compared to identical malloc/free pairs which take ~80 ns each. 
 
 #Benchmarking a Binary Tree#
 
@@ -143,41 +142,40 @@ Haven't written, but free list is much faster for creation and lookups (3/4 - 1/
 
 #Copying 'Garbage Collector'#
 
-[Copying Garbage Collection](https://en.wikipedia.org/wiki/Cheney's_algorithm) is a form of garbage collection where collection consists of copying live memory to a new heap allocating where the old heap existed.
-Many collectors, incluing most if not all generational algorithms, use a variant of this.
+[Copying Garbage Collection](https://en.wikipedia.org/wiki/Cheney's_algorithm) is a form of garbage collection which consists of copying live memory to a new heap and allocating from the old heap.
+Many collectors, such as generational collectors, use a variant of this.
 [Here's](http://spin.atomicobject.com/2014/09/03/visualizing-garbage-collection-algorithms/) a great article with visualizations of various algorithms, concluding with copying algorithms. 
 
 A size effect of the copying process (and some other GC algorithms) is that live data is packed into a contiguous memory space.
 Compaction has numerous performance benefits, such as defragmenting memory and improving cache effeciency.
 
 However, compacting collectors have some downsides besides those commonly associated with GCs -
-the work done is proportional to the live dataset, a large amount of extra memory is required,
-and already compact datastructures will still be processed.
+the work done is proportional to the live dataset and already compact datastructures will still be processed.
 
-Using the allocator-per-datastructure approach, one can get the benefits of a copying GC while avoiding some of the downsides. Mainly:
+Using the allocator-per-datastructure approach, one can get the benefits of a copying GC while avoiding some of the downsides, mainly:
 
 * Extra memory proportional only to the size of the datastructure is required
 * The programmer can arrange allocation patterns for specific use cases
 * **The programmer controls when and if copying ever happens**
 * **The entire world is not stopped upon collection/copying**
 
-I emphasized the last two points because in my opinion, GC pauses and unpredicatability are the two biggest problems with GCs.
-
 Let's look at a benchmark to see how this can affect performance, both based on the binary tree.
 This benchmark will generate many small trees of similar size using different allocation patterns.
 The implementations that will be compared are:
 
-1. A tree randomly built using malloc/free. All results will be normalized to this
+1. A tree randomly built and then pruned, allocated using malloc/free.
 2. A tree copied from 1 allocated with malloc
-3. A tree built in the same fashion as 1 but using a free list for malloc/free
+3. A tree built in the same fashion as 1 but using a free list
 4. A compact tree copied from 1 using a free list and allocations in an 'optimal' pattern
 5. A compact tree copied from 1 using a free list with suboptimal allocations
+
+The 'suboptimal' allocations come from a free list that has been scrambled so that while the data is compact, consecutive allocations are not contiguous in memory.
 
 Here are the results:
 
 <img src="{{site.baseurl}}/images/bench_copy_ns.png"/>
 
-footers when I figure them out:
+While not huge, the results are pretty significant - a ~15% performance boost is nothing to balk at. This would concievably lead to improved performance in the rest of the program, as the live data set (in terms of cache lines) will be smaller.
 
-1. Other allocators can be used like this as well. A linear allocator, or bump allocator, will act even more like a copying garbage collector since memory is allocated with a pointer increment
+<Haven't figured out footer formatting> 1. Other allocators can be used like this as well. A linear allocator, or bump allocator, will act even more like a copying garbage collector since memory is allocated with a pointer increment
 However, memory can ony be freed in very specific patterns or by freeing the entire allocator, which leads to poor resuse of memory space
