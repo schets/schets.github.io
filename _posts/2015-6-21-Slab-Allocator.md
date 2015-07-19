@@ -134,11 +134,15 @@ void list_destroy(struct free_list *ldel) {
 }
 ```
 
-We've managed to make a fairly performant allocator - on my laptop a tight loop random list_malloc/list_free pairs takes ~1.8 ns, as compared to identical malloc/free pairs which take ~80 ns each. 
+We've managed to make a fairly performant allocator - on my laptop list_malloc/list_free pairs takes ~2-5 ns, while malloc/free pairs which take ~80 ns each.
+Of course, this allocator only has a bit of the functionality of malloc - but that functionality isn't always needed.
+
+Let's see how much this affects the creation and modification of a datastructure.
 
 #Benchmarking a Binary Tree#
 
-Haven't written, but free list is much faster for creation and lookups (3/4 - 1/2 runtime on medium or small datastructures)
+This benchmark is pretty simple - it will measure how fast it is to create and modify a binary tree of varying sizes uses each allocator.
+Each binary tree will first be filled with (size/2) random numbers, and then for 
 
 #Copying 'Garbage Collector'#
 
@@ -163,19 +167,27 @@ Let's look at a benchmark to see how this can affect performance, both based on 
 This benchmark will generate many small trees of similar size using different allocation patterns.
 The implementations that will be compared are:
 
-1. A tree randomly built and then pruned, allocated using malloc/free.
-2. A tree copied from 1 allocated with malloc
-3. A tree built in the same fashion as 1 but using a free list
-4. A compact tree copied from 1 using a free list and allocations in an 'optimal' pattern
-5. A compact tree copied from 1 using a free list with suboptimal allocations
+1. Trees randomly built and then pruned, allocated using malloc/free.
+2. Trees copied from 1 allocated with malloc
+3. Trees built in the same fashion as 1 but using a free list
+4. Compact trees copied from 1 using a free list and allocations in an 'optimal' pattern
+5. Compact trees copied from 1 using a free list with suboptimal allocations
 
 The 'suboptimal' allocations come from a free list that has been scrambled so that while the data is compact, consecutive allocations are not contiguous in memory.
 
 Here are the results:
 
-<img src="{{site.baseurl}}/images/bench_copy_ns.png"/>
+<img src="{{site.baseurl}}/images/big-bench-copy-ns.png"/>
 
-While not huge, the results are pretty significant - a ~15% performance boost is nothing to balk at. This would concievably lead to improved performance in the rest of the program, as the live data set (in terms of cache lines) will be smaller.
+While the trees built by copying into a compact representation have significantly lower access times,
+the trees built using the free list have much higher access times - why is that?
+
+#Downsides 
+
+The main downside of this allocator is that it can't return memory to the system until destruction, and as a result can't share memory with other allocators.
+In the previous section, the ns/access grew much more slowly for the malloc benchmark than it did for the plain free list -
+this is because malloc was able to reuse the freed memory to build the other trees, which with the free list, that memory was unused.
+
 
 <Haven't figured out footer formatting> 1. Other allocators can be used like this as well. A linear allocator, or bump allocator, will act even more like a copying garbage collector since memory is allocated with a pointer increment
 However, memory can ony be freed in very specific patterns or by freeing the entire allocator, which leads to poor resuse of memory space
