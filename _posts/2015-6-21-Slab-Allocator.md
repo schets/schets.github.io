@@ -134,7 +134,10 @@ void list_destroy(struct free_list *ldel) {
 }
 ```
 
-We've managed to make a fairly performant allocator - on my laptop list_malloc/list_free pairs takes ~2-5 ns, while malloc/free pairs which take ~80 ns each.
+We've managed to make a fairly performant allocator -
+on my laptop list_malloc/list_free pairs takes ~2-5 ns,
+while malloc/free pairs which take ~80 ns each. <sup><a href="#fn1" id="ref1">1</a></sup>
+
 Of course, this allocator only has a bit of the functionality of malloc - but that functionality isn't always needed.
 
 Let's see how much this affects the creation and modification of a datastructure.
@@ -144,31 +147,20 @@ Let's see how much this affects the creation and modification of a datastructure
 This benchmark is pretty simple - it will measure how fast it is to create and modify a binary tree of varying sizes uses each allocator.
 Each binary tree will first be filled with (size/2) random numbers, and then for 
 
-#Copying 'Garbage Collector'#
+#Compacting Data#
 
-[Copying Garbage Collection](https://en.wikipedia.org/wiki/Cheney's_algorithm) is a form of garbage collection which consists of copying live memory to a new heap and allocating from the old heap.
-Many collectors, such as generational collectors, use a variant of this.
-[Here's](http://spin.atomicobject.com/2014/09/03/visualizing-garbage-collection-algorithms/) a great article with visualizations of various algorithms, concluding with copying algorithms. 
+Unlike malloc, the free list will allocate data from compact blocks of memory.
+In addition, sequential allocations on an unused block are going to be contiguous.
+In theory, this should lead to better cache performance, since cache lines will be more likely
+to contain relevant data, instead of junk or data not being used anytime soon.
 
-A size effect of the copying process (and some other GC algorithms) is that live data is packed into a contiguous memory space.
-Compaction has numerous performance benefits, such as defragmenting memory and improving cache effeciency.
-
-However, compacting collectors have some downsides besides those commonly associated with GCs -
-the work done is proportional to the live dataset and already compact datastructures will still be processed.
-
-Using the allocator-per-datastructure approach, one can get the benefits of a copying GC while avoiding some of the downsides, mainly:
-
-* Extra memory proportional only to the size of the datastructure is required
-* The programmer can arrange allocation patterns for specific use cases
-* **The programmer controls when and if copying ever happens**
-* **The entire world is not stopped upon collection/copying**
 
 Let's look at a benchmark to see how this can affect performance, both based on the binary tree.
 This benchmark will generate many small trees of similar size using different allocation patterns.
 The implementations that will be compared are:
 
-1. Trees randomly built and then pruned, allocated using malloc/free.
-2. Trees copied from 1 allocated with malloc
+1. Trees randomly built and then heavily pruned, allocated using malloc/free.
+2. Trees copied from 1 allocated with malloc (as a control for 4 and 5)
 3. Trees built in the same fashion as 1 but using a free list
 4. Compact trees copied from 1 using a free list and allocations in an 'optimal' pattern
 5. Compact trees copied from 1 using a free list with suboptimal allocations
@@ -180,7 +172,7 @@ Here are the results:
 <img src="{{site.baseurl}}/images/big-bench-copy-ns.png"/>
 
 While the trees built by copying into a compact representation have significantly lower access times,
-the trees built using the free list have much higher access times - why is that?
+the trees built using the free list have much higher access times.
 
 #Downsides 
 
@@ -188,6 +180,8 @@ The main downside of this allocator is that it can't return memory to the system
 In the previous section, the ns/access grew much more slowly for the malloc benchmark than it did for the plain free list -
 this is because malloc was able to reuse the freed memory to build the other trees, which with the free list, that memory was unused.
 
+Another downside is that using allocators of this sort can increase memory usage if too much memory is wasted in empty blocks.
 
-<Haven't figured out footer formatting> 1. Other allocators can be used like this as well. A linear allocator, or bump allocator, will act even more like a copying garbage collector since memory is allocated with a pointer increment
-However, memory can ony be freed in very specific patterns or by freeing the entire allocator, which leads to poor resuse of memory space
+<hr></hr>
+
+<sup id="fn1">1. <a href="#ref1" title="Jump back to footnote 1 in the text.">↩</a></sup>
