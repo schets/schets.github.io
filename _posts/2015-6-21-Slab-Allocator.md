@@ -135,8 +135,8 @@ void list_destroy(struct free_list *ldel) {
 ```
 
 We've managed to make a fairly performant allocator -
-on my laptop list_malloc/list_free pairs takes ~2-5 ns,
-while malloc/free pairs which take ~80 ns each. <sup><a href="#fn1" id="ref1">1</a></sup>
+on my laptop ```list_malloc```/```list_free``` pairs take ~2-5ns
+while malloc/free pairs which take ~80 ns <a href="#fn1" id="ref1">[1]</a>.
 
 Of course, this allocator only has a bit of the functionality of malloc - but that functionality isn't always needed.
 
@@ -149,11 +149,9 @@ Each binary tree will first be filled with (size/2) random numbers, and then for
 
 #Compacting Data#
 
-Unlike malloc, the free list will allocate data from compact blocks of memory.
-In addition, sequential allocations on an unused block are going to be contiguous.
+Unlike malloc, the free list will allocate data from compact blocks of memory, and sequential allocations are initially contiguous (usually).
 In theory, this should lead to better cache performance, since cache lines will be more likely
 to contain relevant data, instead of junk or data not being used anytime soon.
-
 
 Let's look at a benchmark to see how this can affect performance, both based on the binary tree.
 This benchmark will generate many small trees of similar size using different allocation patterns.
@@ -163,13 +161,15 @@ The implementations that will be compared are:
 2. Trees copied from 1 allocated with malloc (as a control for 4 and 5)
 3. Trees built in the same fashion as 1 but using a free list
 4. Compact trees copied from 1 using a free list and allocations in an 'optimal' pattern
-5. Compact trees copied from 1 using a free list with suboptimal allocations
+5. Compact trees copied from 1 using a free list with discontiguous allocations
 
-The 'suboptimal' allocations come from a free list that has been scrambled so that while the data is compact, consecutive allocations are not contiguous in memory.
+The discontiguous allocations come from a free list that has been scrambled by allocating/deallocating elements in a random order
 
 Here are the results:
 
 <img src="{{site.baseurl}}/images/big-bench-copy-ns.png"/>
+
+Awesome! Compacting the data has a pretty big effect on the 
 
 While the trees built by copying into a compact representation have significantly lower access times,
 the trees built using the free list have much higher access times.
@@ -177,11 +177,12 @@ the trees built using the free list have much higher access times.
 #Downsides 
 
 The main downside of this allocator is that it can't return memory to the system until destruction, and as a result can't share memory with other allocators.
-In the previous section, the ns/access grew much more slowly for the malloc benchmark than it did for the plain free list -
-this is because malloc was able to reuse the freed memory to build the other trees, which with the free list, that memory was unused.
-
-Another downside is that using allocators of this sort can increase memory usage if too much memory is wasted in empty blocks.
+In the previous section, the performance discrepancy between the malloc and the free list
+was because malloc can reuse the freed memory to build the other trees <a href="#fn2" id="ref2">[2]</a>.
+The free lists, on the other hand, have a lot of memory sitting around doing sitting around taking up cache space
 
 <hr></hr>
 
-<sup id="fn1">1. <a href="#ref1" title="Jump back to footnote 1 in the text.">↩</a></sup>
+<sup id="fn1">1. ```list_free``` and ```list_malloc``` each execute 6 instructions, have one *very* predictable branch, and rarely leave the L1 cache. The time spent in such a function will be heavily influenced by other factors, like the current state of the pipeline, out of order engine, etc. Etiher way, it probably won't take a significant amount of time (the benchmark loops/branchs took a much large amount of time that then allocations).<a href="#ref1" title="Jump back to footnote 1 in the text.">↩</a></sup>
+
+<sup id="fn1">2. The discrepancy is also a result of the implementation. Each tree of the sequence is built and pruned before the next, meaning that malloc can share the pruned memory. If each tree was built, and then each tree pruned, malloc performs similarly to the free list<a href="#ref2" title="Jump back to footnote 2 in the text.">↩</a></sup>
