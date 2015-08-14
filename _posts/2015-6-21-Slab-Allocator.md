@@ -3,23 +3,24 @@ layout: post
 title: Fixed size free lists and per-datastructure allocators
 ---
 
-*Code and post in progress, [different version of code here](https://github.com/schets/fast_alloc)*.
-
 I'm pushing this to master so that others can more easily review this. If anyone comes across this by chance there's no promise of quality in the post yet. But if I've said something completely wrong/stupid, feel free to let me know.
 
-#Intro#
+*Code and post in progress, [different version of code here](https://github.com/schets/fast_alloc)*.
 
-blah blah blah memory is important malloc is slow many datastructures are only accessed by one thread at a time cache locality write this later ...
+Most general purpose allocators use single heap for allocating memory; some use threadlocal heaps.
+While this works incredibly well for a general purpose allocator, it has some unfortunate downsides.
+Despite the best efforts of modern allocators, allocated could come from any location in the heap.
+In addition, there's often some extra memory attachd to each allocation for bookkeeping purposes
 
-...
+Locality of reference and predictable memory access, or lack thereof, play a
+[huge role](http://igoro.com/archive/gallery-of-processor-cache-effects/) in the performance of a program.
 
-...
 
 
 #Fixed Size Free List#
 [Free lists](https://en.wikipedia.org/wiki/Free_list) are one of (if not the) most effective tools for creating allocators. They're used in some of the most common allocators, including [ptmalloc (used in glibc)](http://code.woboq.org/userspace/glibc/malloc), [jemalloc](http://www.canonware.com/jemalloc/) and [tcmalloc](http://goog-perftools.sourceforge.net/doc/tcmalloc.html), as well as in many [specialized allocators](http://gameprogrammingpatterns.com/object-pool.html).
 
-The fixed size free list only allocates memory chunks of a single size, allowing for a simple and fast free list implementation [This is a good introduction] (http://gameprogrammingpatterns.com/object-pool.html) to the type of list that we'll be implementing. 
+The fixed size free list only allocates memory chunks of a single size, allowing for a simple and fast free list implementation. [This is a good introduction] (http://gameprogrammingpatterns.com/object-pool.html) to the type of list that we'll be implementing. 
 
 Our implementation will work similary, except it will store a list of memory blocks from which memory 'units' can be allocated so that the allocator can expand as needed.
 
@@ -136,7 +137,7 @@ void list_destroy(struct free_list *ldel) {
 
 We've managed to make a fairly performant allocator -
 on my laptop ```list_malloc```/```list_free``` pairs take ~2-5ns
-while malloc/free pairs which take ~80 ns <a href="#fn1" id="ref1">[1]</a>.
+while malloc/free pairs which take ~80 ns <a href="#fn2" id="ref2">[2]</a>.
 
 Of course, this allocator only has a bit of the functionality of malloc - but that functionality isn't always needed.
 
@@ -169,20 +170,23 @@ Here are the results:
 
 <img src="{{site.baseurl}}/images/big-bench-copy-ns.png"/>
 
-Awesome! Compacting the data has a pretty big effect on the 
+Awesome! Compacting the data has a serious effect on the access times!
 
-While the trees built by copying into a compact representation have significantly lower access times,
-the trees built using the free list have much higher access times.
+Unfortunately, all isn't well in free list land. The trees built with free lists
 
 #Downsides 
 
-The main downside of this allocator is that it can't return memory to the system until destruction, and as a result can't share memory with other allocators.
+The main downside of this allocator is that it can't return memory to the system until destruction,
+and as a result can't share memory with other allocators.
 In the previous section, the performance discrepancy between the malloc and the free list
-was because malloc can reuse the freed memory to build the other trees <a href="#fn2" id="ref2">[2]</a>.
-The free lists, on the other hand, have a lot of memory sitting around doing sitting around taking up cache space
+was because malloc can reuse the freed memory to build the other trees <a href="#fn3" id="ref3">[3]</a>.
+The free lists, on the other hand, have a lot of memory sitting around doing sitting around taking up cache space.
 
 <hr></hr>
 
-<sup id="fn1">1. ```list_free``` and ```list_malloc``` each execute 6 instructions, have one *very* predictable branch, and rarely leave the L1 cache. The time spent in such a function will be heavily influenced by other factors, like the current state of the pipeline, out of order engine, etc. Etiher way, it probably won't take a significant amount of time (the benchmark loops/branchs took a much large amount of time that then allocations).<a href="#ref1" title="Jump back to footnote 1 in the text.">↩</a></sup>
 
-<sup id="fn1">2. The discrepancy is also a result of the implementation. Each tree of the sequence is built and pruned before the next, meaning that malloc can share the pruned memory. If each tree was built, and then each tree pruned, malloc performs similarly to the free list<a href="#ref2" title="Jump back to footnote 2 in the text.">↩</a></sup>
+<font size=2 id="fn1">1. The time to execute a single instruction is often less than one cycle - modern x64 processors utilize pipelines, out of order execution, and multiple execution units to increase the number of instructions executed per cycle, and decrease time to execute an instruction.<a href="#ref1" title="Jump back to footnote 1 in the text.">↩</a></font>
+
+<font size=2 id="fn2">2. ```list_free``` and ```list_malloc``` each execute 6 instructions, have one *very* predictable branch, and rarely leave the L1 cache. The time spent in such a function will be heavily influenced by other factors, like the current state of the pipeline, OoO, etc. Etiher way, it probably won't take a significant amount of time (the benchmark loops/branchs took a much larger amount of time than then allocations).<a href="#ref2" title="Jump back to footnote 2 in the text.">↩</a></font>
+
+<font size=2 id="fn3">3. The discrepancy is also a result of the implementation. Each tree of the sequence is built and pruned before the next, meaning that malloc can share the pruned memory. If each tree was built, and then each tree pruned, malloc performs similarly to the free list. On the other hand, if the plain free-list solution shares a list between all of the trees, it has notably better performance<a href="#ref3" title="Jump back to footnote 3 in the text.">↩</a></font>
